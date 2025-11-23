@@ -61,6 +61,10 @@ class Task(Base):
 class TaskCreate(BaseModel):
     title: str
 
+class TaskUpdate(BaseModel):
+    title: str
+    completed: bool
+
 class TaskOut(BaseModel):
     id: int
     title: str
@@ -116,6 +120,75 @@ def read_tasks(
 ):
     tasks = db.query(Task).filter(Task.owner == current_user).all()
     return tasks
+
+
+@app.get("/tasks/{task_id}", response_model=TaskOut)
+def read_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    """
+    Récupère une tâche spécifique par ID.
+    Vérifie que la tâche appartient bien à l'utilisateur connecté.
+    """
+    db_task = db.query(Task).filter(Task.id == task_id).first()
+    if db_task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if db_task.owner != current_user:
+        raise HTTPException(status_code=403, detail="Not authorized to access this task")
+    return db_task
+
+# --- NOUVELLE FONCTIONNALITÉ (PARTIE 4) ---
+@app.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    """
+    Supprime une tâche par ID.
+    Vérifie que la tâche appartient bien à l'utilisateur connecté avant de la supprimer.
+    """
+    db_task = db.query(Task).filter(Task.id == task_id).first()
+
+    if db_task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if db_task.owner != current_user:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this task")
+
+    db.delete(db_task)
+    db.commit()
+    return
+
+# --- NOUVELLE FONCTIONNALITÉ (PARTIE 6) ---
+@app.put("/tasks/{task_id}", response_model=TaskOut)
+def update_task(
+    task_id: int,
+    task: TaskUpdate,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user)
+):
+    """
+    Met à jour une tâche par ID (titre et statut complété).
+    Vérifie que la tâche appartient bien à l'utilisateur connecté avant de la mettre à jour.
+    """
+    db_task = db.query(Task).filter(Task.id == task_id).first()
+
+    if db_task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if db_task.owner != current_user:
+        raise HTTPException(status_code=403, detail="Not authorized to update this task")
+
+    # Mettre à jour les champs
+    db_task.title = task.title
+    db_task.completed = task.completed
+
+    db.commit()
+    db.refresh(db_task)
+    return db_task
 
 @app.on_event("startup")
 def on_startup():
