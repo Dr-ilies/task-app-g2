@@ -4,3 +4,5 @@ pyjwt
 python-jose
 sqlalchemy
 psycopg2-binary  # Driver PostgreSQL
+pytest
+httpx
